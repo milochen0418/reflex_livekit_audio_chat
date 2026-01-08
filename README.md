@@ -2,6 +2,20 @@
 
 A real-time audio conferencing application built with [Reflex](https://reflex.dev/) and [LiveKit](https://livekit.io/).
 
+## 📸 Interface Preview
+
+### Lobby & Login
+Simple entry point to set your display name and room ID.
+
+![Login Page](docs/images/login_page.jpg)
+
+### Active Audio Conference
+Real-time audio visualization with active speaker detection and mute controls.
+
+| Single User View | Multi-User Chat |
+|:---:|:---:|
+| ![Single User](docs/images/room_audio_chat_single_open.jpg) | ![Multi User](docs/images/room_audio_chat_both_open.jpg) |
+
 ## 🌟 Features
 
 ### Core Interface
