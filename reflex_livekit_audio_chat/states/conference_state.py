@@ -83,6 +83,7 @@ class ConferenceState(rx.State):
     @rx.event
     def handle_js_message(self, json_data: str):
         import json
+        logging.info(f"Received JS message: {json_data[:100]}...") # Log first 100 chars
 
         if not json_data or json_data.strip() == "":
             return
@@ -99,6 +100,7 @@ class ConferenceState(rx.State):
                 if data["status"] == "Disconnected":
                     self.is_connected = False
             if "participants" in data:
+                # Ensure each participant has valid keys to avoid rendering errors
                 self.participants = data["participants"]
             if "is_muted" in data:
                 self.is_muted = data["is_muted"]

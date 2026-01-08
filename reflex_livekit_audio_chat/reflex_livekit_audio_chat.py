@@ -186,15 +186,25 @@ def participant_card(participant: dict) -> rx.Component:
             class_name="relative",
         ),
         rx.el.div(
-            rx.el.p(
-                participant["identity"],
-                class_name="font-semibold text-gray-900 truncate",
+            rx.el.div(
+                rx.el.p(
+                    participant["identity"],
+                    class_name="font-semibold text-gray-900 truncate",
+                ),
+                rx.el.p(
+                    rx.cond(participant["is_local"], "You", "Participant"),
+                    class_name="text-xs text-gray-500",
+                ),
+                class_name="flex justify-between items-baseline",
             ),
-            rx.el.p(
-                rx.cond(participant["is_local"], "You", "Participant"),
-                class_name="text-xs text-gray-500",
+            rx.el.div(
+                rx.el.div(
+                    id=f"vol-{participant['identity']}",
+                    class_name="h-full bg-violet-500 transition-all duration-75 rounded-full w-0",
+                ),
+                class_name="h-1 bg-gray-100 rounded-full mt-2 w-full overflow-hidden",
             ),
-            class_name="min-w-0",
+            class_name="min-w-0 w-full",
         ),
         class_name="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm",
     )
@@ -202,11 +212,6 @@ def participant_card(participant: dict) -> rx.Component:
 
 def room_view() -> rx.Component:
     return rx.el.div(
-        rx.el.input(
-            id="js_msg_input",
-            class_name="hidden",
-            on_change=ConferenceState.handle_js_message,
-        ),
         rx.el.div(
             rx.el.div(
                 rx.el.div(
@@ -280,7 +285,14 @@ def room_view() -> rx.Component:
 
 
 def index() -> rx.Component:
-    return rx.cond(ConferenceState.is_connected, room_view(), lobby_view())
+    return rx.el.div(
+        rx.el.input(
+            id="js_msg_input",
+            class_name="hidden",
+            on_change=ConferenceState.handle_js_message,
+        ),
+        rx.cond(ConferenceState.is_connected, room_view(), lobby_view()),
+    )
 
 
 app = rx.App(
@@ -298,6 +310,7 @@ app = rx.App(
         rx.el.script("""
             window.livekitClient = {
                 room: null,
+                audioInterval: null,
 
                 async connect(url, token, username) {
                     try {
@@ -314,6 +327,9 @@ app = rx.App(
                         });
 
                         this.room
+                            .on(LivekitClient.RoomEvent.Connected, () => this.sendStatus({ status: 'Connected' }))
+                            .on(LivekitClient.RoomEvent.Reconnecting, () => this.sendStatus({ status: 'Reconnecting...' }))
+                            .on(LivekitClient.RoomEvent.Reconnected, () => this.sendStatus({ status: 'Connected' }))
                             .on(LivekitClient.RoomEvent.ParticipantConnected, () => this.updateParticipants())
                             .on(LivekitClient.RoomEvent.ParticipantDisconnected, () => this.updateParticipants())
                             .on(LivekitClient.RoomEvent.ActiveSpeakersChanged, () => this.updateParticipants())
@@ -324,6 +340,7 @@ app = rx.App(
                             })
                             .on(LivekitClient.RoomEvent.Disconnected, () => {
                                 this.sendStatus({ status: 'Disconnected', participants: [] });
+                                this.stopAudioVisualizer();
                             });
 
                         await this.room.connect(url, token);
@@ -331,8 +348,13 @@ app = rx.App(
                         // Publish local mic
                         await this.room.localParticipant.setMicrophoneEnabled(true);
 
-                        this.sendStatus({ status: 'Connected' });
                         this.updateParticipants();
+                        this.startAudioVisualizer();
+                        
+                        // Force connected status just in case
+                        if (this.room.state === 'connected') {
+                            this.sendStatus({ status: 'Connected' });
+                        }
                     } catch (error) {
                         console.error('Connection error:', error);
                         this.sendStatus({ type: 'error', message: error.message });
@@ -343,6 +365,37 @@ app = rx.App(
                     if (this.room) {
                         await this.room.disconnect();
                         this.room = null;
+                        this.stopAudioVisualizer();
+                    }
+                },
+
+                startAudioVisualizer() {
+                    this.stopAudioVisualizer();
+                    this.audioInterval = setInterval(() => {
+                        if (!this.room) return;
+                        
+                        const updateBar = (p) => {
+                            if (!p) return;
+                            const identity = p.identity;
+                            const el = document.getElementById('vol-' + identity);
+                            if (el) {
+                                let level = p.audioLevel || 0;
+                                let width = Math.min(100, level * 100 * 5); 
+                                if (width < 5 && width > 0) width = 5;
+                                if (level === 0) width = 0;
+                                el.style.width = width + '%';
+                            }
+                        };
+
+                        if (this.room.localParticipant) updateBar(this.room.localParticipant);
+                        this.room.remoteParticipants.forEach(p => updateBar(p));
+                    }, 50);
+                },
+
+                stopAudioVisualizer() {
+                    if (this.audioInterval) {
+                        clearInterval(this.audioInterval);
+                        this.audioInterval = null;
                     }
                 },
 
@@ -376,15 +429,24 @@ app = rx.App(
 
                     this.sendStatus({
                         participants: participants,
-                        is_muted: !this.room.localParticipant.isMicrophoneEnabled
+                        is_muted: !this.room.localParticipant.isMicrophoneEnabled,
                     });
                 },
 
                 sendStatus(data) {
                     const input = document.getElementById('js_msg_input');
                     if (input) {
-                        input.value = JSON.stringify(data);
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                        console.log('Sending to backend:', data);
+                        const jsonStr = JSON.stringify(data);
+                        
+                        // Hack for React 16+ to trigger onChange
+                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                        nativeInputValueSetter.call(input, jsonStr);
+                        
+                        const event = new Event('input', { bubbles: true });
+                        input.dispatchEvent(event);
+                    } else {
+                        console.error('js_msg_input not found!');
                     }
                 }
             };
