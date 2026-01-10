@@ -66,6 +66,7 @@ Real-time audio visualization with active speaker detection and mute controls.
    LIVEKIT_URL=<your-livekit-url>
    LIVEKIT_API_KEY=<your-api-key>
    LIVEKIT_API_SECRET=<your-api-secret>
+   ADMIN_PASSCODE=<your-admin-passcode>
    ```
 
 ### Running the Application

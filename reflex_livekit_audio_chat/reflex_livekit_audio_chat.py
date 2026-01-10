@@ -48,45 +48,92 @@ def settings_page() -> rx.Component:
                     "Configure your LiveKit Cloud credentials to enable real-time audio features.",
                     class_name="text-gray-500 text-sm mb-8",
                 ),
-                rx.el.form(
-                    rx.el.div(
-                        input_field(
-                            "API Key",
-                            "livekit_api_key",
-                            "devkey...",
-                            value=SettingsState.livekit_api_key,
-                        ),
-                        input_field(
-                            "API Secret",
-                            "livekit_api_secret",
-                            "secret...",
-                            type="password",
-                            value=SettingsState.livekit_api_secret,
-                        ),
-                        input_field(
-                            "LiveKit Server URL",
-                            "livekit_url",
-                            "wss://your-project.livekit.cloud",
-                            value=SettingsState.livekit_url,
-                        ),
-                        rx.el.button(
-                            rx.cond(
-                                SettingsState.is_saving,
-                                rx.el.span("Saving...", class_name="animate-pulse"),
-                                rx.el.div(
-                                    rx.icon("save", class_name="h-4 w-4"),
-                                    "Save Configuration",
-                                    class_name="flex items-center gap-2",
-                                ),
+                rx.cond(
+                    SettingsState.is_admin_authenticated,
+                    rx.el.form(
+                        rx.el.div(
+                            input_field(
+                                "API Key",
+                                "livekit_api_key",
+                                "devkey...",
+                                value=SettingsState.livekit_api_key,
                             ),
-                            type="submit",
-                            disabled=SettingsState.is_saving,
-                            class_name="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center mt-4 disabled:opacity-50",
+                            input_field(
+                                "API Secret",
+                                "livekit_api_secret",
+                                "secret...",
+                                type="password",
+                                value=SettingsState.livekit_api_secret,
+                            ),
+                            input_field(
+                                "LiveKit Server URL",
+                                "livekit_url",
+                                "wss://your-project.livekit.cloud",
+                                value=SettingsState.livekit_url,
+                            ),
+                            rx.el.button(
+                                rx.cond(
+                                    SettingsState.is_saving,
+                                    rx.el.span("Saving...", class_name="animate-pulse"),
+                                    rx.el.div(
+                                        rx.icon("save", class_name="h-4 w-4"),
+                                        "Save Configuration",
+                                        class_name="flex items-center gap-2",
+                                    ),
+                                ),
+                                type="submit",
+                                disabled=SettingsState.is_saving,
+                                class_name="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center mt-4 disabled:opacity-50",
+                            ),
+                            class_name="space-y-5",
                         ),
-                        class_name="space-y-5",
+                        on_submit=SettingsState.save_config,
+                        reset_on_submit=False,
                     ),
-                    on_submit=SettingsState.save_config,
-                    reset_on_submit=False,
+                    rx.el.form(
+                        rx.el.div(
+                            rx.cond(
+                                SettingsState.auth_error != "",
+                                rx.el.div(
+                                    rx.icon(
+                                        "circle-alert",
+                                        class_name="h-5 w-5 text-red-500 shrink-0",
+                                    ),
+                                    rx.el.p(
+                                        SettingsState.auth_error,
+                                        class_name="text-red-700 text-sm",
+                                    ),
+                                    class_name="bg-red-50 p-4 rounded-lg flex items-center gap-3 border border-red-100 mb-2",
+                                ),
+                                rx.fragment(),
+                            ),
+                            input_field(
+                                "Admin Passcode",
+                                "admin_passcode",
+                                "Enter admin passcode",
+                                type="password",
+                            ),
+                            rx.el.button(
+                                rx.cond(
+                                    SettingsState.is_authenticating,
+                                    rx.el.span(
+                                        "Verifying...", class_name="animate-pulse"
+                                    ),
+                                    rx.el.div(
+                                        rx.icon("lock", class_name="h-4 w-4"),
+                                        "Unlock Settings",
+                                        class_name="flex items-center gap-2",
+                                    ),
+                                ),
+                                type="submit",
+                                disabled=SettingsState.is_authenticating,
+                                class_name="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center mt-4 disabled:opacity-50",
+                            ),
+                            class_name="space-y-5",
+                        ),
+                        on_submit=SettingsState.verify_admin,
+                        reset_on_submit=True,
+                    ),
                 ),
                 class_name="w-full max-w-md bg-white p-8 rounded-2xl border border-gray-100 shadow-sm",
             ),
@@ -307,4 +354,4 @@ app = rx.App(
     ],
 )
 app.add_page(index, route="/")
-app.add_page(settings_page, route="/settings", on_load=SettingsState.load_config)
+app.add_page(settings_page, route="/settings", on_load=SettingsState.on_settings_load)
