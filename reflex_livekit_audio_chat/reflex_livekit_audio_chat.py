@@ -1,7 +1,6 @@
 import reflex as rx
 from reflex_livekit_audio_chat.states.settings_state import SettingsState
-from reflex_livekit_audio_chat.states.livekit_bridge_state import LiveKitBridgeState
-from reflex_livekit_audio_chat.livekit_ui import bind_livekit
+from reflex_livekit_audio_chat.livekit_bridge import LiveKitBridgeState, bind_livekit
 
 # Single source of truth for how LiveKit JS binds to this UI.
 LIVEKIT_UI = bind_livekit(LiveKitBridgeState)
