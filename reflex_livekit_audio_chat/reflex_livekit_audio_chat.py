@@ -1,6 +1,10 @@
 import reflex as rx
 from reflex_livekit_audio_chat.states.settings_state import SettingsState
-from reflex_livekit_audio_chat.states.conference_state import ConferenceState
+from reflex_livekit_audio_chat.states.livekit_bridge_state import LiveKitBridgeState
+from reflex_livekit_audio_chat.livekit_ui import bind_livekit
+
+# Single source of truth for how LiveKit JS binds to this UI.
+LIVEKIT_UI = bind_livekit(LiveKitBridgeState)
 
 
 def input_field(
@@ -108,14 +112,14 @@ def lobby_view() -> rx.Component:
                 rx.el.form(
                     rx.el.div(
                         rx.cond(
-                            ConferenceState.error_message != "",
+                            LiveKitBridgeState.error_message != "",
                             rx.el.div(
                                 rx.icon(
                                     "circle-alert",
                                     class_name="h-5 w-5 text-red-500 shrink-0",
                                 ),
                                 rx.el.p(
-                                    ConferenceState.error_message,
+                                    LiveKitBridgeState.error_message,
                                     class_name="text-red-700 text-sm",
                                 ),
                                 class_name="bg-red-50 p-4 rounded-lg flex items-center gap-3 border border-red-100 mb-2",
@@ -126,17 +130,17 @@ def lobby_view() -> rx.Component:
                             "Display Name",
                             "username",
                             "Enter your name",
-                            value=ConferenceState.username,
+                            value=LiveKitBridgeState.username,
                         ),
                         input_field(
                             "Room Name",
                             "room_name",
                             "Enter room to join",
-                            value=ConferenceState.room_name,
+                            value=LiveKitBridgeState.room_name,
                         ),
                         rx.el.button(
                             rx.cond(
-                                ConferenceState.loading,
+                                LiveKitBridgeState.loading,
                                 rx.el.div(
                                     rx.spinner(size="1"),
                                     rx.el.span("Joining..."),
@@ -145,12 +149,12 @@ def lobby_view() -> rx.Component:
                                 "Join Room",
                             ),
                             type="submit",
-                            disabled=ConferenceState.loading,
+                            disabled=LiveKitBridgeState.loading,
                             class_name="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-violet-200 mt-2 disabled:opacity-70",
                         ),
                         class_name="space-y-6",
                     ),
-                    on_submit=ConferenceState.join_room,
+                    on_submit=LiveKitBridgeState.join_room,
                     reset_on_submit=False,
                 ),
                 class_name="w-full max-w-md bg-white p-8 rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50",
@@ -198,9 +202,9 @@ def participant_card(participant: dict) -> rx.Component:
                 class_name="flex justify-between items-baseline",
             ),
             rx.el.div(
-                rx.el.div(
-                    id=f"vol-{participant['identity']}",
-                    class_name="h-full bg-violet-500 transition-all duration-75 rounded-full w-0",
+                LIVEKIT_UI.volume_bar(
+                    participant["identity"],
+                    width=participant.get("audio_width", "0%"),
                 ),
                 class_name="h-1 bg-gray-100 rounded-full mt-2 w-full overflow-hidden",
             ),
@@ -218,7 +222,7 @@ def room_view() -> rx.Component:
                     rx.el.div(
                         rx.icon("hash", class_name="h-5 w-5 text-violet-500"),
                         rx.el.h2(
-                            ConferenceState.room_name,
+                            LiveKitBridgeState.room_name,
                             class_name="text-xl font-bold text-gray-900",
                         ),
                         class_name="flex items-center gap-2",
@@ -226,13 +230,13 @@ def room_view() -> rx.Component:
                     rx.el.div(
                         rx.el.div(
                             class_name=rx.cond(
-                                ConferenceState.connection_status == "Connected",
+                                LiveKitBridgeState.connection_status == "Connected",
                                 "size-2 rounded-full bg-green-500",
                                 "size-2 rounded-full bg-yellow-500 animate-pulse",
                             )
                         ),
                         rx.el.span(
-                            ConferenceState.connection_status,
+                            LiveKitBridgeState.connection_status,
                             class_name="text-sm font-medium text-gray-600",
                         ),
                         class_name="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-gray-100",
@@ -246,7 +250,7 @@ def room_view() -> rx.Component:
                             class_name="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4",
                         ),
                         rx.el.div(
-                            rx.foreach(ConferenceState.participants, participant_card),
+                            rx.foreach(LiveKitBridgeState.participants, participant_card),
                             class_name="flex flex-col gap-3",
                         ),
                         class_name="flex-1 overflow-auto pr-2",
@@ -257,19 +261,19 @@ def room_view() -> rx.Component:
                     rx.el.div(
                         rx.el.button(
                             rx.icon(
-                                rx.cond(ConferenceState.is_muted, "mic-off", "mic"),
+                                rx.cond(LiveKitBridgeState.is_muted, "mic-off", "mic"),
                                 class_name="h-6 w-6",
                             ),
-                            on_click=ConferenceState.toggle_mute,
+                            on_click=LiveKitBridgeState.toggle_mute,
                             class_name=rx.cond(
-                                ConferenceState.is_muted,
+                                LiveKitBridgeState.is_muted,
                                 "p-4 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors",
                                 "p-4 rounded-full bg-violet-100 text-violet-600 hover:bg-violet-200 transition-colors",
                             ),
                         ),
                         rx.el.button(
                             rx.icon("phone-off", class_name="h-6 w-6"),
-                            on_click=ConferenceState.leave_room,
+                            on_click=LiveKitBridgeState.leave_room,
                             class_name="p-4 rounded-full bg-gray-900 text-white hover:bg-gray-800 transition-colors",
                         ),
                         class_name="flex items-center justify-center gap-6",
@@ -286,12 +290,8 @@ def room_view() -> rx.Component:
 
 def index() -> rx.Component:
     return rx.el.div(
-        rx.el.input(
-            id="js_msg_input",
-            class_name="hidden",
-            on_change=ConferenceState.handle_js_message,
-        ),
-        rx.cond(ConferenceState.is_connected, room_view(), lobby_view()),
+        LIVEKIT_UI.bridge_input(),
+        rx.cond(LiveKitBridgeState.is_connected, room_view(), lobby_view()),
     )
 
 
@@ -304,153 +304,7 @@ app = rx.App(
             href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap",
             rel="stylesheet",
         ),
-        rx.el.script(
-            src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"
-        ),
-        rx.el.script("""
-            window.livekitClient = {
-                room: null,
-                audioInterval: null,
-
-                async connect(url, token, username) {
-                    try {
-                        if (this.room) {
-                            await this.room.disconnect();
-                        }
-
-                        this.room = new LivekitClient.Room({
-                            adaptiveStream: true,
-                            dynacast: true,
-                            publishDefaults: {
-                                audioPreset: LivekitClient.AudioPresets.music,
-                            },
-                        });
-
-                        this.room
-                            .on(LivekitClient.RoomEvent.Connected, () => this.sendStatus({ status: 'Connected' }))
-                            .on(LivekitClient.RoomEvent.Reconnecting, () => this.sendStatus({ status: 'Reconnecting...' }))
-                            .on(LivekitClient.RoomEvent.Reconnected, () => this.sendStatus({ status: 'Connected' }))
-                            .on(LivekitClient.RoomEvent.ParticipantConnected, () => this.updateParticipants())
-                            .on(LivekitClient.RoomEvent.ParticipantDisconnected, () => this.updateParticipants())
-                            .on(LivekitClient.RoomEvent.ActiveSpeakersChanged, () => this.updateParticipants())
-                            .on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
-                                if (track.kind === 'audio') {
-                                    track.attach();
-                                }
-                            })
-                            .on(LivekitClient.RoomEvent.Disconnected, () => {
-                                this.sendStatus({ status: 'Disconnected', participants: [] });
-                                this.stopAudioVisualizer();
-                            });
-
-                        await this.room.connect(url, token);
-
-                        // Publish local mic
-                        await this.room.localParticipant.setMicrophoneEnabled(true);
-
-                        this.updateParticipants();
-                        this.startAudioVisualizer();
-                        
-                        // Force connected status just in case
-                        if (this.room.state === 'connected') {
-                            this.sendStatus({ status: 'Connected' });
-                        }
-                    } catch (error) {
-                        console.error('Connection error:', error);
-                        this.sendStatus({ type: 'error', message: error.message });
-                    }
-                },
-
-                async disconnect() {
-                    if (this.room) {
-                        await this.room.disconnect();
-                        this.room = null;
-                        this.stopAudioVisualizer();
-                    }
-                },
-
-                startAudioVisualizer() {
-                    this.stopAudioVisualizer();
-                    this.audioInterval = setInterval(() => {
-                        if (!this.room) return;
-                        
-                        const updateBar = (p) => {
-                            if (!p) return;
-                            const identity = p.identity;
-                            const el = document.getElementById('vol-' + identity);
-                            if (el) {
-                                let level = p.audioLevel || 0;
-                                let width = Math.min(100, level * 100 * 5); 
-                                if (width < 5 && width > 0) width = 5;
-                                if (level === 0) width = 0;
-                                el.style.width = width + '%';
-                            }
-                        };
-
-                        if (this.room.localParticipant) updateBar(this.room.localParticipant);
-                        this.room.remoteParticipants.forEach(p => updateBar(p));
-                    }, 50);
-                },
-
-                stopAudioVisualizer() {
-                    if (this.audioInterval) {
-                        clearInterval(this.audioInterval);
-                        this.audioInterval = null;
-                    }
-                },
-
-                async setMicrophone(enabled) {
-                    if (this.room && this.room.localParticipant) {
-                        await this.room.localParticipant.setMicrophoneEnabled(enabled);
-                        this.updateParticipants();
-                    }
-                },
-
-                updateParticipants() {
-                    if (!this.room) return;
-
-                    const participants = [];
-
-                    // Add local participant
-                    participants.push({
-                        identity: this.room.localParticipant.identity,
-                        is_speaking: this.room.localParticipant.isSpeaking,
-                        is_local: true,
-                    });
-
-                    // Add remote participants
-                    this.room.remoteParticipants.forEach((p) => {
-                        participants.push({
-                            identity: p.identity,
-                            is_speaking: p.isSpeaking,
-                            is_local: false,
-                        });
-                    });
-
-                    this.sendStatus({
-                        participants: participants,
-                        is_muted: !this.room.localParticipant.isMicrophoneEnabled,
-                    });
-                },
-
-                sendStatus(data) {
-                    const input = document.getElementById('js_msg_input');
-                    if (input) {
-                        console.log('Sending to backend:', data);
-                        const jsonStr = JSON.stringify(data);
-                        
-                        // Hack for React 16+ to trigger onChange
-                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                        nativeInputValueSetter.call(input, jsonStr);
-                        
-                        const event = new Event('input', { bubbles: true });
-                        input.dispatchEvent(event);
-                    } else {
-                        console.error('js_msg_input not found!');
-                    }
-                }
-            };
-        """),
+        *LIVEKIT_UI.head_components(),
     ],
 )
 app.add_page(index, route="/")

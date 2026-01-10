@@ -1,10 +1,12 @@
-import reflex as rx
-import os
+import json
 import logging
+import os
+
+import reflex as rx
 from livekit import api
 
 
-class ConferenceState(rx.State):
+class LiveKitBridgeState(rx.State):
     room_name: str = ""
     username: str = ""
     token: str = ""
@@ -27,6 +29,7 @@ class ConferenceState(rx.State):
                 self.error_message = "Username and Room Name are required."
                 self.loading = False
                 return
+
             api_key = os.environ.get("LIVEKIT_API_KEY")
             api_secret = os.environ.get("LIVEKIT_API_SECRET")
             livekit_url = os.environ.get("LIVEKIT_URL")
@@ -36,6 +39,7 @@ class ConferenceState(rx.State):
                 )
                 self.loading = False
                 return
+
             grant = api.VideoGrants(room_join=True, room=room_name)
             access_token = (
                 api.AccessToken(api_key, api_secret)
@@ -44,13 +48,17 @@ class ConferenceState(rx.State):
                 .with_grants(grant)
                 .to_jwt()
             )
+
             self.token = access_token
             self.room_name = room_name
             self.username = username
             self.is_connected = True
             self.connection_status = "Connecting..."
             self.is_muted = False
-            safe_username = self.username.replace("'", "\\'").replace("\\", "\\\\")
+
+            # Escape username for JS.
+            safe_username = self.username.replace("\\", "\\\\").replace("'", "\\'")
+
             self.loading = False
             yield rx.call_script(
                 f"window.livekitClient.connect('{livekit_url}', '{self.token}', '{safe_username}')"
@@ -82,26 +90,27 @@ class ConferenceState(rx.State):
 
     @rx.event
     def handle_js_message(self, json_data: str):
-        import json
-        logging.info(f"Received JS message: {json_data[:100]}...") # Log first 100 chars
-
         if not json_data or json_data.strip() == "":
             return
+
         try:
             data = json.loads(json_data)
-            if "type" in data and data["type"] == "error":
+
+            if data.get("type") == "error":
                 self.error_message = data.get("message", "Unknown error")
                 self.is_connected = False
                 self.loading = False
                 yield rx.toast.error(f"Error: {self.error_message}")
                 return
+
             if "status" in data:
                 self.connection_status = data["status"]
                 if data["status"] == "Disconnected":
                     self.is_connected = False
+
             if "participants" in data:
-                # Ensure each participant has valid keys to avoid rendering errors
                 self.participants = data["participants"]
+
             if "is_muted" in data:
                 self.is_muted = data["is_muted"]
         except json.JSONDecodeError as e:
