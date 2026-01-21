@@ -36,6 +36,10 @@ Real-time audio visualization with active speaker detection and mute controls.
 - **Styling**: Tailwind CSS
 - **Package Manager**: Poetry
 
+## 📐 Architecture & Design
+
+- Design doc (PDF): [docs/Reflex LiveKit Audio Chat — Architecture & Design.pdf](docs/Reflex%20LiveKit%20Audio%20Chat%20%E2%80%94%20Architecture%20%26%20Design.pdf)
+
 ## 🚀 Getting Started
 
 ### Prerequisites
